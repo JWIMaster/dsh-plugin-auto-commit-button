@@ -5,27 +5,10 @@ _What happened in this directory — the last 3 turns here. Each entry records t
 
 - **Directory**: `/Users/jwalr/dsh-plugin-auto-commit-button`
 - **Started**: 2026-10-05 22:24 GMT+11
-- **Last update**: 2026-10-05 22:44 GMT+11
-- **Entries**: 3 (through turn 4)
+- **Last update**: 2026-10-05 22:45 GMT+11
+- **Entries**: 3 (through turn 5)
 
 ## Entries
-
-<!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:2" -->
-### Turn 2 · 2026-10-05 22:40 GMT+11
-Query: make it an npm plugin not a local installation so i can npm publish and then gimme the command to istall via npm mke sure you remove the local install from the web profile okay
-
-Summary: Done. The local install is gone and the package is publish-ready.
-
-## Local install removed
-
-```
-dependencies: @canglongcl/dsh-web-review, @liustack/modsearch, dsh-plugin, dsh-plugin-current-progress
-bundles:      @deepseek-ai/dsh-base, @deepseek-ai/dsh-web-app, @canglongcl/dsh-web-review,
-              @liustack/modsearch, dsh-plugin, dsh-plugin-current-progress
-```
-·
-That is byte-for-byte the profile manifest from before I touched it (compared against the original read in this session's log). Also gone: the `node_modules` symlink pnpm left behind, the lockfile reference, and the composed profile row (`--dump-config` now matches zero times). The running Harness unloaded it live — `/dsh-autoc … (truncated)
-<!-- /progress:entry -->
 
 <!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:3" -->
 ### Turn 3 · 2026-10-05 22:43 GMT+11
@@ -64,4 +47,29 @@ Two notes on that:
 … (truncated)
 
 Done: `/Users/jwalr/dsh-plugin-auto-commit-button/README.md`
+<!-- /progress:entry -->
+
+<!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:5" -->
+### Turn 5 · 2026-10-05 22:45 GMT+11
+Query: so did it work
+
+Summary: Yes — it worked, live, exactly as designed. The commit exists:
+
+```
+5251968  dsh autocommit: turn 4
+·
+session: session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3 repo: /Users/jwalr/dsh-plugin-auto-commit-button branch: main changes: 1
+·
+A	CURRENT_PROGRESS.md
+```
+·
+The Host agrees with the history — live state right now:
+
+```
+enabled: true    busy: false    dirty: 0 files
+lastCommit: { short: "5251968", subject: "dsh autocommit: turn 4", files: 1, turn: 4 }
+lastError: null
+```
+·
+So the whole loop ran in anger: your click armed the repo (persisted in `~/.dsh/auto-commit-button.json`), the turn boundary fired, it staged, committed, and then cleared its own change count to zero. The working tree is comple … (truncated)
 <!-- /progress:entry -->
