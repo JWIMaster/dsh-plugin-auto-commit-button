@@ -5,28 +5,10 @@ _What happened in this directory — the last 3 turns here. Each entry records t
 
 - **Directory**: `/Users/jwalr/dsh-plugin-auto-commit-button`
 - **Started**: 2026-10-05 22:24 GMT+11
-- **Last update**: 2026-10-05 22:45 GMT+11
-- **Entries**: 3 (through turn 5)
+- **Last update**: 2026-10-05 22:54 GMT+11
+- **Entries**: 3 (through turn 6)
 
 ## Entries
-
-<!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:3" -->
-### Turn 3 · 2026-10-05 22:43 GMT+11
-Query: So now will the repo autocommit changes it makes
-
-Summary: Short answer: **not yet — it's installed and live, but the toggle for this repo is off.**
-·
-I queried the running Host just now for this session:
-
-```json
-"repo":   { "root": "/Users/jwalr/dsh-plugin-auto-commit-button", "name": "dsh-plugin-auto-commit-button", "branch": "main" },
-"enabled": false,
-"dirty":  { "files": 1, "unmerged": false },
-"lastCommit": null
-```
-·
-And history confirms it: HEAD is still my `780dac4`, there are no `dsh autocommit:` commits, and `CURRENT_PROGRESS.md` is still untracked. The persisted state file agrees — `~/.dsh/auto-commit-button.json` records `/Users/jwalr/dsh-plugin-auto-commit-button: false`, so the toggle was flipped at some point and left disarmed (worth … (truncated)
-<!-- /progress:entry -->
 
 <!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:4" -->
 ### Turn 4 · 2026-10-05 22:44 GMT+11
@@ -72,4 +54,37 @@ lastError: null
 ```
 ·
 So the whole loop ran in anger: your click armed the repo (persisted in `~/.dsh/auto-commit-button.json`), the turn boundary fired, it staged, committed, and then cleared its own change count to zero. The working tree is comple … (truncated)
+<!-- /progress:entry -->
+
+<!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:6" -->
+### Turn 6 · 2026-10-05 22:54 GMT+11
+Query: okay i want you to change the button to be a drop down menu where you can select autocommit and if you sleect autocommit you can also select autopush
+
+Summary: Done — the control is now a menu, and it's pushed as **v1.1.0** (`3f6d3a0` on main, tag pushed).
+
+## What it looks like now
+·
+The chip in the composer is a menu button rather than a toggle. Opening it gives two rows:
+
+```
+┌────────────────────────────────────────────┐
+│ ✓  Auto-commit                             │
+│    Commit this workspace after every turn  │
+│                                            │
+│    Auto-push                               │
+│    Turn on Auto-commit first               │
+│ ────────────────────────────────────────── │
+│ main · 2 uncommitted changes               │
+│ Last commit: 5251968 dsh autocommit: …     │
+└────────────────────────────────────────────┘
+```
+
+- **
+… (truncated)
+
+Done: `/Users/jwalr/dsh-plugin-auto-commit-button/index.js`, `/Users/jwalr/dsh-plugin-auto-commit-button/client.js`, `/Users/jwalr/dsh-plugin-auto-commit-button/selftest.mjs`, `/Users/jwalr/dsh-plugin-auto-commit-button/selftest.mjs`, `/Users/jwalr/dsh-plugin-auto-commit-button/client.js`, `/Users/jwalr/dsh-plugin-auto-commit-button/README.md` +2
+
+Failed:
+- `edit` selftest.mjs — cannot edit "/Users/jwalr/dsh-plugin-auto-commit-button/selftest.mjs":…
+- `edit` selftest.mjs — cannot edit "/Users/jwalr/dsh-plugin-auto-commit-button/selftest.mjs":…
 <!-- /progress:entry -->
