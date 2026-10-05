@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.svg" alt="The auto-commit button icon" width="72" height="72">
+</p>
+
 # dsh-plugin-auto-commit-button
 
 A DeepSeek Harness plugin that puts one menu in the composer. Switch
@@ -5,8 +9,6 @@ A DeepSeek Harness plugin that puts one menu in the composer. Switch
 that holds the session's workspace, so the work an agent did lands in history as
 it happens instead of waiting for someone to remember. Switch **Auto-push** on as
 well and each of those commits is pushed too.
-
-<img src="icon.svg" alt="The auto-commit button icon" width="72" height="72">
 
 ## Behaviour
 
@@ -87,10 +89,15 @@ dsh plugin --profile web add /path/to/dsh-plugin-auto-commit-button
 
 Either way the bundle patch (`cordis.patch.yml`) inserts the Host row and
 carries the default configuration; override any of it from the profile's own
-patch layer. Installing into a running Harness takes effect on reload; a profile
-that reports `restart-required` needs the app restarted to load the new package
-generation — the browser half is served from the composed boot graph, so the
-page has to be reloaded with it.
+patch layer.
+
+An upgrade has two halves, and they do not land together. The browser half is
+read from the installed package per request, so a reloaded page can pick up a new
+version immediately — while the Host half is a module the running process
+imported once, and only a restart replaces it. Between the two, a new control
+talks to the previous Host and reports the mismatch it gets back, so **restart
+the Host after upgrading** (`restart-required` in the plugin manager, or relaunch
+`dsh web`), and reload the page.
 
 ## Configuration
 
