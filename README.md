@@ -5,7 +5,7 @@ every finished turn is committed to the Git repository that holds the session's
 workspace, so the work an agent did lands in history as it happens instead of
 waiting for someone to remember.
 
-![The control in the composer tool row](icon.svg)
+<img src="icon.svg" alt="The auto-commit button icon" width="72" height="72">
 
 ## Behaviour
 
