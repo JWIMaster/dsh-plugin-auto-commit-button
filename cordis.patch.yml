@@ -1,0 +1,42 @@
+# Bundle patch: inserts the auto-commit-button Host plugin into the profile.
+# The browser half (client.js) is declared by `dsh.client` in package.json and
+# is served by the client module system; nothing here has to mention it.
+# Every value below is optional; the plugin falls back to the same defaults.
+- insert:
+    - id: auto-commit-button
+      name: 'dsh-plugin-auto-commit-button'
+      config:
+        # Repositories start unarmed: the control in the composer is the opt-in.
+        # Set this to true to arm every repository the moment a session opens.
+        enabled: false
+        # 'workspace' commits only what changed under the session's working
+        # directory, which is what keeps one package of a large monorepo from
+        # sweeping up everybody else's unfinished work. 'repo' commits all of it.
+        scope: workspace
+        # Push after each commit. Off by default: a push is a network round trip
+        # that would sit in the turn boundary, and it is not what was asked for.
+        push: false
+        # Bypass pre-commit and commit-msg hooks. Off: an automatic commit should
+        # still have to pass whatever the repository checks before it commits.
+        noVerify: false
+        # Commit subject. Placeholders: {summary} (e.g. "turn 4"), {turn},
+        # {files}, {repo}, {branch}, {session}.
+        subject: 'dsh autocommit: {summary}'
+        # Pathspecs never staged, e.g. ['CURRENT_PROGRESS.md', '*.local'].
+        # exclude: []
+        # Longest file list written into the commit body before the rest is
+        # counted instead.
+        maxFilesListed: 24
+        # Milliseconds one git command may run before it is killed.
+        timeoutMs: 20000
+        pushTimeoutMs: 60000
+        # A repository rooted at your home directory or at a filesystem root is
+        # refused, because an automatic commit there is unreviewable in scope.
+        allowHomeRepo: false
+        # How long a resolved repository and its change count are reused by the
+        # composer control's polling.
+        statusTtlMs: 3000
+        # Diagnostics (off by default): set this to a file path to append one
+        # line per decision — adoption, repository resolution, and the outcome
+        # of every commit. Useful when a turn commits nothing.
+        # traceFile: /Users/jwalr/.dsh/plugins/auto-commit-button/trace.log

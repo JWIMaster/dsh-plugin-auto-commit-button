@@ -1,0 +1,15 @@
+# Dependencies are installed by the harness profile, never committed here.
+node_modules/
+
+# Local diagnostics produced by the `traceFile` option.
+*.log
+trace.log
+
+# The Host's per-repository toggle state, when a profile points DSH_HOME here.
+auto-commit-button.json
+
+# macOS
+.DS_Store
+
+# npm pack output
+*.tgz

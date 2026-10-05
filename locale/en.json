@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Auto-commit button",
+    "description": "Adds a toggle to the composer that arms automatic Git commits for the repository holding the session's workspace: at the end of every turn the changes made under the working directory are staged and committed."
+  }
+}

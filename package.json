@@ -1,0 +1,66 @@
+{
+	"name": "dsh-plugin-auto-commit-button",
+	"version": "1.0.0",
+	"description": "Adds a toggle to the DeepSeek Harness composer that arms automatic Git commits for the repository holding the session's workspace: changes are committed at the end of every turn, so the work an agent did lands in history as it happens.",
+	"type": "module",
+	"license": "MIT",
+	"author": "JWI <jwi@j-w-i.org>",
+	"homepage": "https://github.com/JWIMaster/dsh-plugin-auto-commit-button#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/JWIMaster/dsh-plugin-auto-commit-button.git"
+	},
+	"bugs": {
+		"url": "https://github.com/JWIMaster/dsh-plugin-auto-commit-button/issues"
+	},
+	"keywords": [
+		"dsh",
+		"dsh-plugin",
+		"deepseek",
+		"deepseek-harness",
+		"cordis",
+		"cordis-plugin",
+		"git",
+		"autocommit",
+		"commit",
+		"composer",
+		"toggle"
+	],
+	"engines": {
+		"node": ">=20.3.0"
+	},
+	"scripts": {
+		"test": "node --check index.js && node --check client.js && node selftest.mjs"
+	},
+	"exports": {
+		".": "./index.js",
+		"./client": "./client.js",
+		"./locale/*.json": "./locale/*.json",
+		"./icon": "./icon.svg",
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"index.js",
+		"client.js",
+		"cordis.patch.yml",
+		"locale/*.json",
+		"icon.svg",
+		"README.md",
+		"LICENSE"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"dsh": {
+		"bundle": {
+			"patch": "./cordis.patch.yml"
+		},
+		"client": {
+			"inject": [
+				"@deepseek-ai/dsh-client-locale",
+				"@deepseek-ai/dsh-client-ui-slots"
+			],
+			"platform": "web"
+		}
+	}
+}
