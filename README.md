@@ -1,9 +1,10 @@
 # dsh-plugin-auto-commit-button
 
-A DeepSeek Harness plugin that puts one toggle in the composer. Turn it on and
-every finished turn is committed to the Git repository that holds the session's
-workspace, so the work an agent did lands in history as it happens instead of
-waiting for someone to remember.
+A DeepSeek Harness plugin that puts one menu in the composer. Switch
+**Auto-commit** on and every finished turn is committed to the Git repository
+that holds the session's workspace, so the work an agent did lands in history as
+it happens instead of waiting for someone to remember. Switch **Auto-push** on as
+well and each of those commits is pushed too.
 
 <img src="icon.svg" alt="The auto-commit button icon" width="72" height="72">
 
@@ -12,18 +13,23 @@ waiting for someone to remember.
 1. **The control.** A chip labelled *Auto-commit* sits in the composer tool row,
    next to the permission and mode controls. It reads the Host state on a short
    timer, so a second window on the same repository shows the same thing.
-2. **Arming.** Clicking it arms the repository. The armed state belongs to the
-   repository, not to one session: every session whose working directory is
-   inside it sees the same state, and every one of them commits.
+2. **The menu.** Clicking the chip opens two switches. *Auto-commit* commits what
+   a finished turn changed; *Auto-push* pushes each of those commits. Auto-push
+   needs something to push, so it stays disabled until Auto-commit is on, and
+   says why.
 3. **Every turn.** At the `agent/turn-stopping` boundary — the point where the
    model owes no further output — the changes under the working directory are
-   staged and committed. A turn that changed nothing commits nothing.
-4. **The tooltip.** Hovering the control shows the repository and branch, the
-   current change count, the last commit it made, and the reason whenever
-   something did not work.
+   staged and committed, and then pushed if Auto-push is on. A turn that changed
+   nothing commits nothing.
+4. **The report.** The chip's tooltip carries the state and the change count; the
+   menu's footer carries the repository and branch, the change count, the last
+   commit (and whether it was pushed), and the reason whenever something did not
+   work.
 
-The toggle survives a Host restart: it is written to
-`$DSH_HOME/auto-commit-button.json`, keyed by repository root.
+Both switches belong to the repository, keyed by its root, so every session
+whose working directory is inside it sees the same pair, and every one of them
+commits. They survive a Host restart: they are written to
+`$DSH_HOME/auto-commit-button.json`, one entry per repository.
 
 ## What it commits, and what it refuses
 
@@ -41,25 +47,29 @@ nobody reviews:
   repository would make one click commit everything you own. It is refused
   outright unless you set `allowHomeRepo: true`.
 
-A workspace that is in no repository has nothing to arm: the control renders
-disabled and its tooltip says to run `git init`. Hooks still run, so a repository
-that gates commits on a pre-commit check keeps gating them; `noVerify: true`
-turns that off if you want it off.
+A workspace that is in no repository has nothing to switch: both rows of the menu
+are disabled and the footer says to run `git init`. Hooks still run, so a
+repository that gates commits on a pre-commit check keeps gating them;
+`noVerify: true` turns that off if you want it off.
 
-Nothing is ever pushed. `push: true` pushes after each commit, which adds a
-network round trip to the turn boundary and is not what most people mean by
-"auto-commit".
+Auto-push is off until you turn it on. It runs a plain `git push`, so it follows
+your `push.default` and upstream configuration; a branch with no upstream fails
+there rather than guessing a remote, the commit still stands, and the menu shows
+the failure.
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
-| `/autocommit` or `/autocommit status` | Report the repository, the branch, the armed state, the change count, and the last commit or the last error. |
-| `/autocommit on` / `/autocommit off` | Arm or disarm this session's repository. The same switch the control flips, for anyone who prefers typing. |
+| `/autocommit` or `/autocommit status` | Report the repository, the branch, both switches, the change count, and the last commit or the last error. |
+| `/autocommit on` / `/autocommit off` | Turn Auto-commit on or off for this session's repository. The same switch the menu flips, for anyone who prefers typing. |
+| `/autocommit push on` / `/autocommit push off` | Turn Auto-push on or off. |
 | `/autocommit now` | Commit immediately, without waiting for the next turn. |
 
-Without a `commands` service in the profile the plugin still watches turns; it
-just cannot be asked to do these three things, and says so once in the log.
+Turning Auto-commit off keeps the Auto-push preference, so switching commits
+back on restores the pair you had. Without a `commands` service in the profile
+the plugin still watches turns; it just cannot be asked to do these four things,
+and says so once in the log.
 
 ## Install
 
@@ -88,9 +98,9 @@ Every value in the patch row's `config` is optional.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `enabled` | `false` | Arm every repository as soon as a session opens, instead of waiting for the control. |
+| `enabled` | `false` | What the commit switch starts at for a repository that was never switched in the composer. `true` commits every repository a session opens. |
 | `scope` | `workspace` | `workspace` stages the session's working directory; `repo` stages the whole repository. |
-| `push` | `false` | Push after each commit. |
+| `push` | `false` | What the push switch starts at for a repository that was never switched. Both switches in force are the stored pair when there is one, and these defaults when there is not. |
 | `noVerify` | `false` | Pass `--no-verify`, skipping pre-commit and commit-msg hooks. |
 | `subject` | `dsh autocommit: {summary}` | Commit subject. Placeholders: `{summary}` (`turn 4`, or `manual commit`), `{turn}`, `{files}`, `{repo}`, `{branch}`, `{session}`. |
 | `exclude` | `[]` | Pathspecs never staged, e.g. `['CURRENT_PROGRESS.md']`. |
@@ -127,14 +137,16 @@ Two halves, held together by three same-origin JSON routes.
   it depends on nothing but Node built-ins and the `agents` service.
 - **`client.js` — the browser half.** One registration into the
   `conversation.input.left` slot from `@deepseek-ai/dsh-client-ui-conversation`,
-  written as a module-loader bundle with no build step: `react` is the platform
-  seed module and everything else is browser API. The store behind the control
-  polls only while the control is on screen.
+  written as a module-loader bundle with no build step: `react` and `react-dom`
+  are platform seed modules and everything else is browser API. The menu is
+  portaled to the document body and positioned from the trigger's rect, so the
+  composer's own stacking and overflow cannot crop it; the store behind the
+  control polls only while the control is on screen.
 
 | Route | Does |
 | --- | --- |
-| `GET /dsh-autocommit/state?sessionId=…` | The repository, branch, armed state, change count, last commit, and last error for one session. |
-| `POST /dsh-autocommit/toggle` | `{ sessionId, enabled }` — arm or disarm, and return the new state. Refused unless the request's `Origin` matches the Host's. |
+| `GET /dsh-autocommit/state?sessionId=…` | The repository, branch, both switches, change count, last commit, last push, and last error for one session. |
+| `POST /dsh-autocommit/toggle` | `{ sessionId, commit?, push? }` — set either switch, and return the new state. `enabled` is still accepted as the pre-menu name of `commit`. Refused unless the request's `Origin` matches the Host's. |
 
 ## Development
 
@@ -143,10 +155,14 @@ npm test        # node --check on both halves, then selftest.mjs
 ```
 
 `selftest.mjs` runs both halves the way they are actually used: the Host half
-against real `git` in throwaway repositories in the temporary directory (doing
-the turn boundary, the routes, the command, the guards, and the restart), and
-the browser half by loading `client.js` through a stand-in module loader and
-rendering the registered component. Nothing needs the Harness running.
+against real `git` in throwaway repositories in the temporary directory —
+including a bare repository standing in for a remote, so the push switch is
+proved by reading the remote's history — doing the turn boundary, the switches,
+the routes, the command, the guards, the state file, and a restart; and the
+browser half by loading `client.js` through a stand-in module loader and
+rendering the registered control with a minimal hook runtime, so the trigger,
+the menu, its two rows, the keyboard routing, and the requests a click sends are
+all driven for real. Nothing needs the Harness running.
 
 ## Publishing (maintainers)
 

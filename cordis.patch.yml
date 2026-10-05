@@ -6,15 +6,17 @@
     - id: auto-commit-button
       name: 'dsh-plugin-auto-commit-button'
       config:
-        # Repositories start unarmed: the control in the composer is the opt-in.
-        # Set this to true to arm every repository the moment a session opens.
+        # What the commit switch starts at for a repository nobody has switched
+        # in the composer. The control is the opt-in; true commits every
+        # repository the moment a session opens in it.
         enabled: false
         # 'workspace' commits only what changed under the session's working
         # directory, which is what keeps one package of a large monorepo from
         # sweeping up everybody else's unfinished work. 'repo' commits all of it.
         scope: workspace
-        # Push after each commit. Off by default: a push is a network round trip
-        # that would sit in the turn boundary, and it is not what was asked for.
+        # What the push switch starts at for a repository nobody has switched.
+        # Off by default: a push is a network round trip that would sit in the
+        # turn boundary, and Auto-push in the composer is the way to ask for it.
         push: false
         # Bypass pre-commit and commit-msg hooks. Off: an automatic commit should
         # still have to pass whatever the repository checks before it commits.

@@ -1,22 +1,26 @@
 /**
  * dsh-plugin-auto-commit-button — the Host half.
  *
- * One toggle in the composer arms automatic Git commits for the repository that
- * holds this session's working directory. At every `agent/turn-stopping`
- * boundary — the point where the model owes no further output — the plugin
- * stages what changed under the working directory and commits it, so the work
- * an agent did is in history as soon as the turn ends instead of waiting for
- * someone to remember.
+ * One switch pair in the composer arms automatic Git commits — and optionally
+ * pushes — for the repository that holds this session's working directory. At
+ * every `agent/turn-stopping` boundary — the point where the model owes no
+ * further output — the plugin stages what changed under the working directory
+ * and commits it, so the work an agent did is in history as soon as the turn
+ * ends instead of waiting for someone to remember.
  *
  * Behaviour
  * ---------
  * 1. A session's working directory is resolved against Git once, and cached;
- *    a directory that is in no repository has nothing to arm, and the composer
- *    control explains that instead of offering a toggle that cannot work.
- * 2. The toggle is a property of the *repository*, not of one session: every
- *    session whose working directory is inside that repository sees the same
- *    state, and the state survives a Host restart because it is written to
- *    `$DSH_HOME/auto-commit-button.json`.
+ *    a directory that is in no repository has nothing to switch, and the
+ *    composer control explains that instead of offering a switch that cannot
+ *    work.
+ * 2. The two switches are properties of the *repository*, not of one session:
+ *    every session whose working directory is inside that repository sees the
+ *    same pair, and the pair survives a Host restart because it is written to
+ *    `$DSH_HOME/auto-commit-button.json`. `commit` decides whether a finished
+ *    turn commits at all; `push` decides whether a commit is then pushed, and
+ *    the two are stored independently so turning commits off and on again does
+ *    not forget the push preference.
  * 3. `scope: workspace` (the default) commits only what changed under the
  *    session's working directory; `scope: repo` commits the repository. The
  *    narrower default is what keeps a workspace that is one package of a large
@@ -70,7 +74,8 @@ const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
  * still captures the turn's work.
  */
 const DEFAULTS = {
-	// Repositories start unarmed: the control in the composer is the opt-in.
+	// What a repository that was never switched in the composer does. The
+	// persisted per-repository pair wins over both of these.
 	enabled: false,
 	// 'workspace' stages the session's working directory; 'repo' stages the repository.
 	scope: 'workspace',
@@ -96,7 +101,7 @@ export function apply(ctx, config = {}) {
 	const cfg = resolveConfig(config, warn);
 	/** Live sessions, keyed by session id. */
 	const sessions = new Map();
-	/** Repository root → armed. The whole toggling surface. */
+	/** Repository root → the stored switch pair. The whole switchable surface. */
 	const toggles = loadToggles();
 	/** Resolved once: the Xcode stub on macOS must not be executed. */
 	const gitPath = resolveGitExecutable();
@@ -150,6 +155,7 @@ export function apply(ctx, config = {}) {
 			repoCheckedAt: 0,
 			dirty: null,
 			lastCommit: null,
+			lastPush: null,
 			lastError: null
 		});
 		trace(cfg, agent.id, `adopted (${source}) cwd=${cwd}`);
@@ -182,7 +188,7 @@ export function apply(ctx, config = {}) {
 		if (record === undefined) return;
 		try {
 			const repo = await resolveRepo(record, false);
-			if (!isEnabled(record, repo)) return;
+			if (!switchesFor(record, repo).commit) return;
 			await commitNow(record, { turn, trigger: 'turn' });
 		} catch (error) {
 			// The turn boundary is serial: a throw here would be the plugin's fault,
@@ -191,33 +197,47 @@ export function apply(ctx, config = {}) {
 		}
 	}), `${name}: turn boundary`);
 
-	// ------------------------------------------------------------------ toggles
+	// ----------------------------------------------------------------- switches
 
 	/**
-	 * Whether this session's repository is armed.
+	 * The two switches in force for one session's repository.
+	 *
+	 * `commit` decides whether a finished turn commits at all; `push` decides
+	 * whether a commit is then pushed. A repository's stored pair wins over the
+	 * profile defaults, and the two are stored independently so turning commits
+	 * off and on again does not silently forget the push preference.
+	 *
 	 * @param record - the session.
 	 * @param repo - its resolved repository, or null.
-	 * @returns the effective state.
+	 * @returns the effective pair.
 	 */
-	function isEnabled(record, repo) {
-		if (repo !== null && toggles.has(repo.root)) return toggles.get(repo.root);
-		return cfg.enabled;
+	function switchesFor(record, repo) {
+		const stored = repo === null ? undefined : toggles.get(repo.root);
+		return {
+			commit: stored?.commit ?? cfg.enabled,
+			push: stored?.push ?? cfg.push
+		};
 	}
 
 	/**
-	 * Arm or disarm one session's repository and persist the choice.
-	 * @param record - the session whose repository is toggled.
-	 * @param enabled - the requested state.
+	 * Set either switch for one session's repository and persist the pair.
+	 * @param record - the session whose repository is being changed.
+	 * @param patch - `commit` and/or `push`; omitted members keep their value.
 	 * @returns whether the change was accepted, with the reason when it was not.
 	 */
-	async function setEnabled(record, enabled) {
+	async function setSwitches(record, patch) {
 		const repo = await resolveRepo(record, false);
 		if (repo === null) return { ok: false, message: `No Git repository contains ${record.cwd}.` };
 		const blocked = repoBlocked(repo.root);
 		if (blocked !== null) return { ok: false, message: blocked };
-		toggles.set(repo.root, enabled);
+		const current = switchesFor(record, repo);
+		const next = {
+			commit: typeof patch.commit === 'boolean' ? patch.commit : current.commit,
+			push: typeof patch.push === 'boolean' ? patch.push : current.push
+		};
+		toggles.set(repo.root, next);
 		saveToggles(toggles);
-		note(`${enabled ? 'armed' : 'disarmed'} ${repo.root}`);
+		note(`${repo.root}: commit=${String(next.commit)} push=${String(next.push)}`);
 		return { ok: true };
 	}
 
@@ -413,10 +433,12 @@ export function apply(ctx, config = {}) {
 		note(`committed ${short} (${String(files.length)} file${files.length === 1 ? '' : 's'}) in ${repo.root} [${trigger}]`);
 		trace(cfg, record.sessionId, `trigger=${trigger} committed ${short} files=${String(files.length)}`);
 
-		if (cfg.push) {
+		if (switchesFor(record, repo).push) {
 			const pushed = await runGit(['push'], cwd, cfg.pushTimeoutMs);
 			if (!pushed.ok) {
 				record.lastError = { message: `Committed ${short}, but the push failed: ${failureText(pushed)}`, at: Date.now() };
+			} else {
+				record.lastPush = { short, at: Date.now() };
 			}
 		}
 		return { kind: 'committed', short, subject: message.subject, files: files.length, repo: repo.root };
@@ -464,18 +486,23 @@ export function apply(ctx, config = {}) {
 	async function snapshotOf(record, options = {}) {
 		const repo = await resolveRepo(record, options.refresh === true);
 		if (options.refresh === true && repo !== null) record.dirty = await readStatus(scopeCwd(record, repo));
+		const switches = switchesFor(record, repo);
 		return {
 			sessionId: record.sessionId,
 			cwd: record.cwd,
 			repo,
 			blocked: repo === null ? null : repoBlocked(repo.root),
 			gitAvailable: gitPath !== null,
-			enabled: isEnabled(record, repo),
+			// `enabled` mirrors `commit` for a browser bundle cached before the
+			// control grew its second switch.
+			enabled: switches.commit,
+			commit: switches.commit,
+			push: switches.push,
 			busy: record.busy !== null,
 			scope: cfg.scope,
-			push: cfg.push,
 			dirty: record.dirty,
 			lastCommit: record.lastCommit,
+			lastPush: record.lastPush,
 			lastError: record.lastError
 		};
 	}
@@ -489,7 +516,8 @@ export function apply(ctx, config = {}) {
 		if (!snapshot.gitAvailable) return 'Git is not installed, or it is not on PATH.';
 		if (snapshot.repo === null) return `No Git repository contains ${snapshot.cwd}.`;
 		const lines = [
-			`Auto-commit is ${snapshot.enabled ? 'on' : 'off'} for ${snapshot.repo.name} (${snapshot.repo.branch.length > 0 ? snapshot.repo.branch : 'detached HEAD'}) at ${snapshot.repo.root}.`,
+			`Auto-commit is ${snapshot.commit ? 'on' : 'off'} for ${snapshot.repo.name} (${snapshot.repo.branch.length > 0 ? snapshot.repo.branch : 'detached HEAD'}) at ${snapshot.repo.root}.`,
+			`Auto-push is ${snapshot.push ? 'on' : 'off'}.`,
 			`Scope: ${snapshot.scope === 'repo' ? 'the whole repository' : 'this working directory'}.`
 		];
 		if (snapshot.blocked !== null) lines.push(snapshot.blocked);
@@ -515,7 +543,7 @@ export function apply(ctx, config = {}) {
 		try {
 			off = commands.register({
 				name: 'autocommit',
-				description: 'Turn automatic Git commits on or off, or commit now (/autocommit on|off|now|status)',
+				description: 'Turn automatic Git commits and pushes on or off, or commit now (/autocommit on|off|push on|push off|now|status)',
 				handler: (invocation) => runAutocommitCommand(invocation)
 			});
 		} catch (error) {
@@ -539,7 +567,13 @@ export function apply(ctx, config = {}) {
 				return { kind: 'success', text: describeState(await snapshotOf(record, { refresh: true })) };
 			}
 			if (verb === 'on' || verb === 'off') {
-				const changed = await setEnabled(record, verb === 'on');
+				const changed = await setSwitches(record, { commit: verb === 'on' });
+				if (!changed.ok) return { kind: 'error', text: changed.message };
+				return { kind: 'success', text: describeState(await snapshotOf(record, { refresh: true })) };
+			}
+			const pushVerb = /^push\s+(on|off)$/u.exec(verb);
+			if (pushVerb !== null) {
+				const changed = await setSwitches(record, { push: pushVerb[1] === 'on' });
 				if (!changed.ok) return { kind: 'error', text: changed.message };
 				return { kind: 'success', text: describeState(await snapshotOf(record, { refresh: true })) };
 			}
@@ -548,7 +582,7 @@ export function apply(ctx, config = {}) {
 				if (outcome.kind === 'committed') return { kind: 'success', text: `Committed ${outcome.short} in ${outcome.repo} (${String(outcome.files)} file${outcome.files === 1 ? '' : 's'}).` };
 				return { kind: 'error', text: outcome.message ?? 'Nothing to commit.' };
 			}
-			return { kind: 'error', text: 'Use /autocommit on, off, now, or status.' };
+			return { kind: 'error', text: 'Use /autocommit on, off, push on, push off, now, or status.' };
 		} catch (error) {
 			return { kind: 'error', text: `Auto-commit failed: ${describe(error)}` };
 		}
@@ -605,11 +639,17 @@ export function apply(ctx, config = {}) {
 				sendJson(res, 404, { message: 'Unknown session.' });
 				return;
 			}
-			if (typeof body?.enabled !== 'boolean') {
-				sendJson(res, 400, { message: 'A boolean "enabled" is required.' });
+			// `enabled` is the pre-dropdown name of the commit switch, still
+			// accepted so a cached browser bundle keeps working.
+			const patch = {};
+			if (typeof body?.commit === 'boolean') patch.commit = body.commit;
+			else if (typeof body?.enabled === 'boolean') patch.commit = body.enabled;
+			if (typeof body?.push === 'boolean') patch.push = body.push;
+			if (patch.commit === undefined && patch.push === undefined) {
+				sendJson(res, 400, { message: 'A boolean "commit" or "push" is required.' });
 				return;
 			}
-			const changed = await setEnabled(record, body.enabled);
+			const changed = await setSwitches(record, patch);
 			if (!changed.ok) {
 				sendJson(res, 409, { message: changed.message });
 				return;
@@ -701,38 +741,66 @@ export function apply(ctx, config = {}) {
 	}
 
 	/**
-	 * Read the persisted per-repository toggles.
-	 * @returns repository root → armed; empty when nothing was ever toggled.
+	 * Read the persisted per-repository switches.
+	 * @returns repository root → the stored switch pair; empty when nothing was
+	 *   ever switched.
 	 */
 	function loadToggles() {
-		const map = new Map();
-		try {
-			const parsed = JSON.parse(readFileSync(stateFile(), 'utf8'));
-			const repos = parsed?.repos;
-			if (typeof repos === 'object' && repos !== null) {
-				for (const [root, armed] of Object.entries(repos)) if (typeof armed === 'boolean') map.set(root, armed);
-			}
-		} catch {
-			/* A missing or unreadable state file simply means nothing is armed yet. */
-		}
-		return map;
+		return readSwitches(stateFile());
 	}
 
 	/**
-	 * Persist the per-repository toggles.
-	 * @param map - the current toggles.
+	 * Persist the per-repository switches.
+	 *
+	 * The file is shared — another Host process, another profile, or a previous
+	 * generation of this plugin may hold entries this instance never loaded — so
+	 * this instance's view is merged onto what is on disk rather than replacing
+	 * it. Replacing it silently drops every switch made elsewhere, which is how
+	 * a write here once disarmed a repository switched in another window.
+	 *
+	 * @param map - the current switches; updated with everything the file holds.
 	 */
 	function saveToggles(map) {
 		try {
 			const path = stateFile();
+			const merged = readSwitches(path);
+			for (const [root, pair] of map) merged.set(root, pair);
+			for (const [root, pair] of merged) map.set(root, pair);
 			mkdirSync(dirname(path), { recursive: true });
 			const temporary = `${path}.tmp`;
-			writeFileSync(temporary, `${JSON.stringify({ version: 1, repos: Object.fromEntries(map) }, null, '\t')}\n`);
+			writeFileSync(temporary, `${JSON.stringify({ version: 2, repos: Object.fromEntries(merged) }, null, '\t')}\n`);
 			renameSync(temporary, path);
 		} catch (error) {
 			warn(`could not save the toggle state: ${describe(error)}`);
 		}
 	}
+}
+
+/**
+ * Read one switch file.
+ *
+ * Version 1 stored one boolean per repository — the commit switch — so a file
+ * written before the control grew its second switch still reads as what it
+ * meant: commits armed, push at the profile default.
+ *
+ * @param path - the file to read.
+ * @returns repository root → the stored switch pair; empty when there is none.
+ */
+function readSwitches(path) {
+	const map = new Map();
+	try {
+		const parsed = JSON.parse(readFileSync(path, 'utf8'));
+		const repos = parsed?.repos;
+		if (typeof repos === 'object' && repos !== null) {
+			for (const [root, stored] of Object.entries(repos)) {
+				if (typeof stored === 'boolean') map.set(root, { commit: stored, push: false });
+				else if (typeof stored === 'object' && stored !== null) map.set(root, { commit: stored.commit === true, push: stored.push === true });
+			}
+		}
+	} catch {
+		/* A missing or unreadable state file simply means nothing is switched. */
+	}
+	return map;
 }
 
 // --------------------------------------------------------------------- helpers

@@ -1,7 +1,7 @@
 {
 	"name": "dsh-plugin-auto-commit-button",
-	"version": "1.0.0",
-	"description": "Adds a toggle to the DeepSeek Harness composer that arms automatic Git commits for the repository holding the session's workspace: changes are committed at the end of every turn, so the work an agent did lands in history as it happens.",
+	"version": "1.1.0",
+	"description": "Adds a menu to the DeepSeek Harness composer with two switches: Auto-commit commits the repository holding the session's workspace at the end of every turn, and Auto-push pushes each of those commits.",
 	"type": "module",
 	"license": "MIT",
 	"author": "JWI <jwi@j-w-i.org>",
