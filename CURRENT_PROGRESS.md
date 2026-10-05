@@ -5,31 +5,10 @@ _What happened in this directory — the last 3 turns here. Each entry records t
 
 - **Directory**: `/Users/jwalr/dsh-plugin-auto-commit-button`
 - **Started**: 2026-10-05 22:24 GMT+11
-- **Last update**: 2026-10-05 22:54 GMT+11
-- **Entries**: 3 (through turn 6)
+- **Last update**: 2026-10-05 23:00 GMT+11
+- **Entries**: 3 (through turn 8)
 
 ## Entries
-
-<!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:4" -->
-### Turn 4 · 2026-10-05 22:44 GMT+11
-Query: fix the size of teh logo in the readme its kinda huge rn
-
-Summary: Fixed and pushed.
-·
-**Cause:** `icon.svg` has a `viewBox` but no `width`/`height`, so it has no intrinsic size — the browser fell back to the default replaced-element box and the mark dominated the page.
-
-```html
-<img src="icon.svg" alt="The auto-commit button icon" width="72" height="72">
-```
-·
-Two notes on that:
-
-- I used an HTML `img` rather than markdown `![]()`, because markdown has no way to set a size — this is the form that works on GitHub, npm and the editor preview alike. 72px is a third of the way up the usual mark range; say the word if you want it bigger or smaller.
-- I corrected the alt text while I was there. It read "The control in the composer tool row", which claims the image
-… (truncated)
-
-Done: `/Users/jwalr/dsh-plugin-auto-commit-button/README.md`
-<!-- /progress:entry -->
 
 <!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:5" -->
 ### Turn 5 · 2026-10-05 22:45 GMT+11
@@ -87,4 +66,29 @@ Done: `/Users/jwalr/dsh-plugin-auto-commit-button/index.js`, `/Users/jwalr/dsh-p
 Failed:
 - `edit` selftest.mjs — cannot edit "/Users/jwalr/dsh-plugin-auto-commit-button/selftest.mjs":…
 - `edit` selftest.mjs — cannot edit "/Users/jwalr/dsh-plugin-auto-commit-button/selftest.mjs":…
+<!-- /progress:entry -->
+
+<!-- progress:entry id="session-b7f7f71e-7990-4a64-94dd-c6e83c6da0c3:8" -->
+### Turn 8 · 2026-10-05 23:00 GMT+11
+Query: when i try and turn it on i get The switch could not be changed: A boolean "enabled" is required.
+
+Summary: Found it — and it's a version skew, not a bug in the feature.
+
+## What's happening
+·
+Your browser is running the **1.1.0 client bundle**, but the **running Host is still 1.0.0**:
+
+| | Evidence |
+| --- | --- |
+| npm | `1.1.0` published ✓ |
+| Profile | dependency `^1.1.0`, installed package `1.1.0`, its `client.js` contains the new copy ✓ |
+| Running Host | state payload has **no** `commit`/`lastPush` fields, and rejects `commit` with `{"message":"A boolean \"enabled\" is required."}` ✗ |
+·
+I reproduced your exact error by sending the new client's request to the live Host:
+
+```
+POST {"commit":true,"push":false}  →  {"message":"A boolean \"enabled\" is required."}
+```
+·
+The Host half is an ESM mod … (truncated)
 <!-- /progress:entry -->
